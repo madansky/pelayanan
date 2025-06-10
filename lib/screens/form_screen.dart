@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 class FormScreen extends StatefulWidget {
   @override
@@ -8,21 +10,65 @@ class FormScreen extends StatefulWidget {
 
 class _FormScreenState extends State<FormScreen> {
   final _formKey = GlobalKey<FormState>();
-  String name = '', email = '', report = '';
+  final TextEditingController _uraiPerihalController = TextEditingController();
+
+  String nama = '', pangkat = '', nrp = '', satuan = '', dalamRangka = '', noHp = '';
+  String? perihal;
+  DateTime? tanggal;
+  TimeOfDay? jam;
+  File? selfie;
+  File? lampiran;
+
+  final List<String> perihalOptions = [
+    'Sound System',
+    'Vicon',
+    'Jaringan Internet',
+    'Dukungan Alkom',
+    'Lainnya'
+  ];
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      initialDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => tanggal = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) setState(() => jam = picked);
+  }
+
+  Future<void> _pickSelfie() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.camera);
+    if (picked != null) setState(() => selfie = File(picked.path));
+  }
+
+  Future<void> _pickLampiran() async {
+    final result = await FilePicker.platform.pickFiles();
+    if (result != null) setState(() => lampiran = File(result.files.first.path!));
+  }
 
   void _submit() async {
-    if (_formKey.currentState!.validate()) {
-      await FirebaseFirestore.instance.collection('reports').add({
-        'name': name,
-        'email': email,
-        'report': report,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+    if (_formKey.currentState!.validate() &&
+        tanggal != null && jam != null && selfie != null && lampiran != null) {
+
+      // Simpan ke Firebase atau backend di sini
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Laporan berhasil dikirim')),
       );
       Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Harap isi semua field yang wajib')),
+      );
     }
   }
 
@@ -30,32 +76,60 @@ class _FormScreenState extends State<FormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Formulir Pelaporan')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(children: [
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Nama'),
-              onChanged: (val) => name = val,
-              validator: (val) => val!.isEmpty ? 'Masukkan nama' : null,
+            _buildTextField(label: 'Nama', onChanged: (val) => nama = val),
+            _buildTextField(label: 'Pangkat', onChanged: (val) => pangkat = val),
+            _buildTextField(label: 'NRP', onChanged: (val) => nrp = val, keyboardType: TextInputType.number),
+            _buildTextField(label: 'Satuan', onChanged: (val) => satuan = val),
+            DropdownButtonFormField<String>(
+              decoration: InputDecoration(labelText: 'Perihal'),
+              value: perihal,
+              items: perihalOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (val) => setState(() => perihal = val),
+              validator: (val) => val == null ? 'Pilih perihal' : null,
             ),
             TextFormField(
-              decoration: InputDecoration(labelText: 'Email'),
-              onChanged: (val) => email = val,
-              validator: (val) => val!.isEmpty ? 'Masukkan email' : null,
+              controller: _uraiPerihalController,
+              decoration: InputDecoration(labelText: 'Uraian Perihal'),
+              validator: (val) => val!.isEmpty ? 'Masukkan uraian perihal' : null,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Laporan'),
-              maxLines: 3,
-              onChanged: (val) => report = val,
-              validator: (val) => val!.isEmpty ? 'Masukkan laporan' : null,
+            _buildTextField(label: 'Dalam Rangka', onChanged: (val) => dalamRangka = val),
+            Row(
+              children: [
+                Expanded(child: Text(tanggal == null ? 'Tanggal belum dipilih' : 'Tanggal: ${tanggal!.toLocal()}'.split(' ')[0])),
+                TextButton(onPressed: _pickDate, child: Text('Pilih Tanggal')),
+              ],
             ),
+            Row(
+              children: [
+                Expanded(child: Text(jam == null ? 'Jam belum dipilih' : 'Jam: ${jam!.format(context)}')),
+                TextButton(onPressed: _pickTime, child: Text('Pilih Jam')),
+              ],
+            ),
+            _buildTextField(label: 'No. HP Pelapor', onChanged: (val) => noHp = val, keyboardType: TextInputType.phone),
+            SizedBox(height: 10),
+            ElevatedButton(onPressed: _pickSelfie, child: Text('Upload Foto Selfie')),
+            if (selfie != null) Text('Foto selfie terpilih'),
+            ElevatedButton(onPressed: _pickLampiran, child: Text('Lampiran Dokumen')),
+            if (lampiran != null) Text('Dokumen terpilih'),
             SizedBox(height: 20),
-            ElevatedButton(child: Text('Kirim'), onPressed: _submit),
+            ElevatedButton(onPressed: _submit, child: Text('Kirim')),
           ]),
         ),
       ),
+    );
+  }
+
+  Widget _buildTextField({required String label, required Function(String) onChanged, TextInputType? keyboardType}) {
+    return TextFormField(
+      decoration: InputDecoration(labelText: label),
+      onChanged: onChanged,
+      keyboardType: keyboardType,
+      validator: (val) => val!.isEmpty ? 'Wajib diisi' : null,
     );
   }
 }
