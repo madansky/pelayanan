@@ -13,10 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() {
     if (_formKey.currentState!.validate()) {
       if (username == 'admin' && password == '1234') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => AdminDashboard()),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AdminDashboard()),);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Login gagal')),
@@ -53,3 +50,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
