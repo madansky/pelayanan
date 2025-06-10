@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/upload_service.dart';
 import 'dart:io';
 
 class FormScreen extends StatefulWidget {
@@ -59,18 +61,42 @@ class _FormScreenState extends State<FormScreen> {
     if (_formKey.currentState!.validate() &&
         tanggal != null && jam != null && selfie != null && lampiran != null) {
 
-      // Simpan ke Firebase atau backend di sini
+      final snackBar = ScaffoldMessenger.of(context);
+      snackBar.showSnackBar(SnackBar(content: Text('Mengirim...')));
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Laporan berhasil dikirim')),
-      );
-      Navigator.pop(context);
+      // URL dari Google Apps Script Web App kamu
+      const scriptUrl = 'https://script.google.com/macros/s/AKfycbw0fE59JrF7UgExtk6ZCj0HG8aVW7ykx_9ZpdlMmto53TwdxTXboGb_txzYD_K-cuLt9g/exec';
+
+      final selfieUrl = await UploadService.uploadFile(selfie!, 'selfie_${DateTime.now().millisecondsSinceEpoch}.jpg', scriptUrl);
+      final lampiranUrl = await UploadService.uploadFile(lampiran!, 'lampiran_${DateTime.now().millisecondsSinceEpoch}.pdf', scriptUrl);
+
+      if (selfieUrl != null && lampiranUrl != null) {
+        await FirebaseFirestore.instance.collection('laporan').add({
+          'nama': nama,
+          'pangkat': pangkat,
+          'nrp': nrp,
+          'satuan': satuan,
+          'perihal': perihal,
+          'uraiPerihal': _uraiPerihalController.text,
+          'dalamRangka': dalamRangka,
+          'tanggal': tanggal?.toIso8601String(),
+          'jam': jam?.format(context),
+          'noHp': noHp,
+          'selfieUrl': selfieUrl,
+          'lampiranUrl': lampiranUrl,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        snackBar.showSnackBar(SnackBar(content: Text('Laporan berhasil dikirim')));
+        Navigator.pop(context);
+      } else {
+        snackBar.showSnackBar(SnackBar(content: Text('Gagal mengupload file')));
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Harap isi semua field yang wajib')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Harap isi semua field yang wajib')));
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
